@@ -49,3 +49,9 @@ var post_options = {
 
 // Send the POST request
 ```
+
+#### Docker
+```
+docker build . -t verifier:1.0
+docker run -p 3003:3003 verifier:1.0
+```
