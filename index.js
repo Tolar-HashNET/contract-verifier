@@ -63,6 +63,72 @@ async function storeContract(solContract, contractAddress) {
     return await db.put(contractAddress, solContract);
 }
 
+function compileSol(solcSnap, input, filename) {
+    console.log(solcSnap.version());
+
+    let output = JSON.parse(solcSnap.compile(JSON.stringify(input)))
+
+    console.log(output)
+
+    var result;
+    for (var contractName in output.contracts[filename]) {
+        console.log(contractName + ': ' + output.contracts[filename][contractName].evm.deployedBytecode.object)
+        result = output.contracts[filename][contractName].evm.deployedBytecode.object
+    }
+
+    return result
+}
+
+function compareBytecodes(contract_address, contract_code, compiledBytecode, response) {
+    var params = {
+        host: explorer_ip,
+        port: 443,
+        method: 'GET',
+        path: '/api/contract/' + contract_address,
+    };
+    console.log(params)
+
+    utils.httpRequest(params)
+        .then(function (body) {
+            console.log(body);
+
+            if (body.bytecode == compiledBytecode) {
+                console.log('bytecodes identical!')
+
+                storeContract(contract_code, contract_address)
+                    .then(() => {
+                        console.log("Stored solidity source code for " + contract_address)
+                        return response.status(200).send({
+                            verified: true,
+                            status: "Solidity source code for " + contract_address + " is now verified",
+                            runtime_bytecode: compiledBytecode,
+                            solidity_code: contract_code
+                        })
+                    })
+                    .catch(err => {
+                        console.log("Failed to store source code")
+                        console.log(err)
+                        return response.status(500).send({
+                            verified: false,
+                            status: "Failed to store solidity source code",
+                        })
+                    });
+            } else {
+                console.log('bytecodes are not the same!')
+                return response.status(400).send({
+                    verified: false,
+                    status: "Bytecodes are not the same!",
+                })
+            }
+        })
+        .catch(error => {
+            console.log(error)
+            return response.status(400).send({
+                verified: false,
+                status: "Error while fetching by contract address",
+            })
+        })
+}
 
 router.post('/verify', (request, response) => {
     var filename = request.body.contract_filename || "test";
@@ -110,67 +176,8 @@ router.post('/verify', (request, response) => {
     };
 
     loadRemoteVersion(request.body.compiler_version)
-        .then(solcSnap => {
-            console.log(solcSnap.version());
-
-            let output = JSON.parse(solcSnap.compile(JSON.stringify(input)))
-
-            console.log(output)
-
-            var result;
-            for (var contractName in output.contracts[filename]) {
-                console.log(contractName + ': ' + output.contracts[filename][contractName].evm.deployedBytecode.object)
-                result = output.contracts[filename][contractName].evm.deployedBytecode.object
-            }
-
-            var params = {
-                host: explorer_ip,
-                port: 443,
-                method: 'GET',
-                path: '/api/contract/' + request.body.contract_address,
-            };
-
-            utils.httpRequest(params)
-                .then(function (body) {
-                    console.log(body);
-
-                    if (body.bytecode == result) {
-                        console.log('bytecodes identical!')
-
-                        storeContract(request.body.contract_code, request.body.contract_address)
-                            .then(() => {
-                                console.log("Stored solidity source code for " + request.body.contract_address)
-                                return response.status(200).send({
-                                    verified: true,
-                                    status: "Solidity source code for " + request.body.contract_address + " is now verified",
-                                    runtime_bytecode: result,
-                                    solidity_code: request.body.contract_code
-                                })
-                            })
-                            .catch(err => {
-                                console.log("Failed to store source code")
-                                console.log(err)
-                                return response.status(500).send({
-                                    verified: false,
-                                    status: "Failed to store solidity source code",
-                                })
-                            });
-                    } else {
-                        console.log('bytecodes are not the same!')
-                        return response.status(400).send({
-                            verified: false,
-                            status: "Bytecodes are not the same!",
-                        })
-                    }
-                })
-                .catch(error => {
-                    console.log(error)
-                    return response.status(400).send({
-                        verified: false,
-                        status: "Failed to store solidity source code",
-                    })
-                })
-        })
+        .then(solcSnap => compileSol(solcSnap, input, filename))
+        .then(compiledBytecode => compareBytecodes(request.body.contract_address, request.body.contract_code, compiledBytecode, response))
         .catch(err => {
             console.log(err);
             return response.status(500).send({
