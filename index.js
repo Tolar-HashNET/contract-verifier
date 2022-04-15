@@ -65,10 +65,6 @@ async function storeContract(solContract, contractAddress) {
 
 
 router.post('/verify', (request, response) => {
-    console.log('+++ request +++')
-    console.log(request.body)
-    console.log('++++++++')
-
     var filename = request.body.contract_filename || "test";
     if (filename.slice(-4).toLowerCase() == '.sol') {
         filename = filename.slice(0, -4);
@@ -124,9 +120,6 @@ router.post('/verify', (request, response) => {
             var result;
             for (var contractName in output.contracts[filename]) {
                 console.log(contractName + ': ' + output.contracts[filename][contractName].evm.deployedBytecode.object)
-                console.log("+++++++")
-                console.log(output.contracts[filename][contractName]);
-                console.log("+++++++")
                 result = output.contracts[filename][contractName].evm.deployedBytecode.object
             }
 
@@ -166,7 +159,7 @@ router.post('/verify', (request, response) => {
                         console.log('bytecodes are not the same!')
                         return response.status(400).send({
                             verified: false,
-                            status: "Failed to store solidity source code",
+                            status: "Bytecodes are not the same!",
                         })
                     }
                 })
@@ -182,7 +175,7 @@ router.post('/verify', (request, response) => {
             console.log(err);
             return response.status(500).send({
                 verified: false,
-                status: "Failed to store solidity source code",
+                status: "Error while verifying contract",
             })
         })
 
