@@ -68,19 +68,19 @@ function compileSol(solcSnap, input, filename, contract_to_check) {
     console.log(solcSnap.version());
 
     let output = JSON.parse(solcSnap.compile(JSON.stringify(input)))
-    console.log(output)
+    //console.log(output)
 
     var result = {};
     for (var contractName in output.contracts[filename]) {
         if (contractName != contract_to_check) {
             continue;
         }
-        console.log(contractName)
-        console.log("{}{}{}}{}{}{}")
-        console.log(output.contracts[filename][contractName].abi)  
+        // console.log(contractName)
+        // console.log("{}{}{}}{}{}{}")
+        // console.log(output.contracts[filename][contractName].abi)  
         result.abi = output.contracts[filename][contractName].abi
-        console.log("{}{}{}}{}{}{}")
-        console.log(contractName + ': ' + output.contracts[filename][contractName].evm.deployedBytecode.object)
+        // console.log("{}{}{}}{}{}{}")
+        // console.log(contractName + ': ' + output.contracts[filename][contractName].evm.deployedBytecode.object)
         result.deployedBytecode = output.contracts[filename][contractName].evm.deployedBytecode.object
     }
 
@@ -94,11 +94,11 @@ function compareBytecodes(contract_address, contract_code, compilationResult, re
         method: 'GET',
         path: '/api/contract/' + contract_address,
     };
-    console.log(params)
+    //console.log(params)
 
     utils.httpRequest(params)
         .then(function (body) {
-            console.log(body);
+            //console.log(body);
             
             if (body.bytecode == compilationResult.deployedBytecode) {
                 console.log('bytecodes identical!')
@@ -138,7 +138,7 @@ function compareBytecodes(contract_address, contract_code, compilationResult, re
         })
 }
 
-router.post('/verify', (request, response) => {
+function verify(request, response) {
     var filename = request.body.contract_filename || "test";
     if (filename.slice(-4).toLowerCase() == '.sol') {
         filename = filename.slice(0, -4);
@@ -193,8 +193,26 @@ router.post('/verify', (request, response) => {
                 status: "Error while verifying contract",
             })
         })
+} 
 
+function checkIfContractAlreadyVerified(request, response) {
+    db.get(request.body.contract_address)
+        .then(result => {
+            console.log("Contract at address " + request.body.contract_address + " is already verified.")
+            return response.status(200).send({
+                verified: true,
+                status: "Contract is already verified"
+            })
+        })
+        .catch(err => {
+            console.log(err);
+            console.log("Contract is not verifed yet, we can continue!")
+            return verify(request, response);
+        })
+}
 
+router.post('/verify', (request, response) => {
+    return checkIfContractAlreadyVerified(request, response);
 });
 
 app.use("/", router);
