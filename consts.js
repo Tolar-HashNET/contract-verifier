@@ -101,5 +101,12 @@ export const compiler_versions = [
 ];
 
 export const evm_versions = [
-    'london', 'petersburg', 'istanbul', 'constantinopole', 'byzantium', 'spuriousDragon', 'tangerineWhistle', 'homestead'
+    'london', 
+    'petersburg', 
+    'istanbul', 
+    'constantinopole', 
+    'byzantium', 
+    'spuriousDragon', 
+    'tangerineWhistle', 
+    'homestead'
 ];

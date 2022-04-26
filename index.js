@@ -34,7 +34,8 @@ const bodyParser = require("body-parser")
 
 const cors = require("cors");
 app.use(cors());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json({limit: "8mb"}));
+app.use(bodyParser.urlencoded({limit: "8mb", extended: true, parameterLimit:8000}));
 
 const util = require('util');
 const loadRemoteVersion = util.promisify(solc.loadRemoteVersion);
@@ -60,26 +61,33 @@ router.get('/contract/:address', (request, response) => {
 });
 
 async function storeContract(solContract, contractAddress) {
-    return await db.put(contractAddress, solContract);
+    return await db.put(contractAddress, JSON.stringify(solContract));
 }
 
-function compileSol(solcSnap, input, filename) {
+function compileSol(solcSnap, input, filename, contract_to_check) {
     console.log(solcSnap.version());
 
     let output = JSON.parse(solcSnap.compile(JSON.stringify(input)))
-
     console.log(output)
 
-    var result;
+    var result = {};
     for (var contractName in output.contracts[filename]) {
+        if (contractName != contract_to_check) {
+            continue;
+        }
+        console.log(contractName)
+        console.log("{}{}{}}{}{}{}")
+        console.log(output.contracts[filename][contractName].abi)  
+        result.abi = output.contracts[filename][contractName].abi
+        console.log("{}{}{}}{}{}{}")
         console.log(contractName + ': ' + output.contracts[filename][contractName].evm.deployedBytecode.object)
-        result = output.contracts[filename][contractName].evm.deployedBytecode.object
+        result.deployedBytecode = output.contracts[filename][contractName].evm.deployedBytecode.object
     }
 
     return result
 }
 
-function compareBytecodes(contract_address, contract_code, compiledBytecode, response) {
+function compareBytecodes(contract_address, contract_code, compilationResult, response) {
     var params = {
         host: explorer_ip,
         port: 443,
@@ -91,17 +99,17 @@ function compareBytecodes(contract_address, contract_code, compiledBytecode, res
     utils.httpRequest(params)
         .then(function (body) {
             console.log(body);
-
-            if (body.bytecode == compiledBytecode) {
+            
+            if (body.bytecode == compilationResult.deployedBytecode) {
                 console.log('bytecodes identical!')
 
-                storeContract(contract_code, contract_address)
+                storeContract({deployedBytecode: compilationResult.deployedBytecode, contract: contract_code, abi: compilationResult.abi, isErc20: utils.checkIsErc20(compilationResult.abi), isErc721: utils.checkIsErc721(compilationResult.abi)}, contract_address)
                     .then(() => {
                         console.log("Stored solidity source code for " + contract_address)
                         return response.status(200).send({
                             verified: true,
                             status: "Solidity source code for " + contract_address + " is now verified",
-                            runtime_bytecode: compiledBytecode,
+                            runtime_bytecode: compilationResult.deployedBytecode,
                             solidity_code: contract_code
                         })
                     })
@@ -135,7 +143,7 @@ router.post('/verify', (request, response) => {
     if (filename.slice(-4).toLowerCase() == '.sol') {
         filename = filename.slice(0, -4);
     }
-    filename = filename.replace(/[^A-Za-z0-9]/g, '')
+    filename = filename.replace(/[^A-Za-z0-9_]/g, '')
     filename = 'contracts/' + filename + '.sol';
     console.log(filename)
 
@@ -176,8 +184,8 @@ router.post('/verify', (request, response) => {
     };
 
     loadRemoteVersion(request.body.compiler_version)
-        .then(solcSnap => compileSol(solcSnap, input, filename))
-        .then(compiledBytecode => compareBytecodes(request.body.contract_address, request.body.contract_code, compiledBytecode, response))
+        .then(solcSnap => compileSol(solcSnap, input, filename, request.body.contract_name))
+        .then(compilationResult => compareBytecodes(request.body.contract_address, request.body.contract_code, compilationResult, response))
         .catch(err => {
             console.log(err);
             return response.status(500).send({
