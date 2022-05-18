@@ -55,3 +55,9 @@ var post_options = {
 docker build . -t verifier:1.0
 docker run -p 3003:3003 verifier:1.0
 ```
+
+#### Build and push to gcr
+```
+docker build . -t gcr.io/tolar-devops-311210/contract-verifier:1.4
+docker push gcr.io/tolar-devops-311210/contract-verifier:1.4
+```

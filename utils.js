@@ -1,4 +1,4 @@
-const http = require('https');
+const http = require('follow-redirects').http;
 
 function httpRequest(params, postData) {
     return new Promise(function (resolve, reject) {
