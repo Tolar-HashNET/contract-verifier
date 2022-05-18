@@ -90,7 +90,6 @@ function compileSol(solcSnap, input, filename, contract_to_check) {
 function compareBytecodes(contract_address, contract_code, compilationResult, response) {
     var params = {
         host: explorer_ip,
-        port: 443,
         method: 'GET',
         path: '/api/contract/' + contract_address,
     };
